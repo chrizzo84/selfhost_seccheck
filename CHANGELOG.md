@@ -5,6 +5,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Docker workflow that builds, smoke-tests and pushes the image to GHCR on every push to `main` (`edge`,
+  `sha-<commit>`) and on release tags (`latest`, `x.y.z`, `x.y`), for amd64 and arm64, with SBOM and signed
+  build provenance.
+
 ## [0.1.0] - 2026-10-23
 
 First public release.

@@ -1,6 +1,7 @@
 # SelfHost SecCheck
 
 [![CI](https://github.com/chrizzo84/selfhost-seccheck/actions/workflows/ci.yml/badge.svg)](https://github.com/chrizzo84/selfhost-seccheck/actions/workflows/ci.yml)
+[![Docker](https://github.com/chrizzo84/selfhost-seccheck/actions/workflows/docker.yml/badge.svg)](https://github.com/chrizzo84/selfhost-seccheck/pkgs/container/selfhost-seccheck)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 
 **English** · [Deutsch](README.de.md)
@@ -60,13 +61,32 @@ Missing your favourite app? Adding one is a single file, see [CONTRIBUTING.md](C
 
 ### Docker (recommended)
 
+Prebuilt images for amd64 and arm64 are published to the GitHub Container Registry:
+
+```bash
+docker run -d --name seccheck \
+  -p 127.0.0.1:8000:8000 \
+  -v seccheck-data:/app/data \
+  ghcr.io/chrizzo84/selfhost-seccheck:latest      # http://127.0.0.1:8000
+```
+
+| Tag | Content |
+|---|---|
+| `latest`, `1.2.3`, `1.2` | releases |
+| `edge` | latest commit on `main` |
+| `sha-<commit>` | a specific commit |
+
+Images come with an SBOM and signed build provenance (`gh attestation verify oci://ghcr.io/chrizzo84/selfhost-seccheck:latest --owner chrizzo84`).
+
+Or build it yourself from the repository:
+
 ```bash
 git clone https://github.com/chrizzo84/selfhost-seccheck.git
 cd selfhost-seccheck
-docker compose up -d --build        # http://127.0.0.1:8000, data in ./data
+docker compose up -d --build        # http://127.0.0.1:8000, data in the "seccheck-data" volume
 ```
 
-The compose file binds to `127.0.0.1` only. See [Running it safely](#running-it-safely) before exposing it.
+Both bind to `127.0.0.1` only. See [Running it safely](#running-it-safely) before exposing it.
 
 ### Without Docker
 

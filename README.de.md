@@ -31,10 +31,20 @@ Die Liste der unterstützten Anwendungen und aller Checks steht in der [englisch
 
 ### Docker (empfohlen)
 
+Fertige Images für amd64 und arm64 liegen in der GitHub Container Registry
+(`latest` = letztes Release, `edge` = aktueller Stand von `main`):
+
+```bash
+docker run -d --name seccheck -p 127.0.0.1:8000:8000 -v seccheck-data:/app/data \
+  ghcr.io/chrizzo84/selfhost-seccheck:latest
+```
+
+Oder selbst bauen:
+
 ```bash
 git clone https://github.com/chrizzo84/selfhost-seccheck.git
 cd selfhost-seccheck
-docker compose up -d --build        # http://127.0.0.1:8000, Daten in ./data
+docker compose up -d --build        # http://127.0.0.1:8000, Daten im Volume "seccheck-data"
 ```
 
 Die Compose-Datei bindet nur an `127.0.0.1`. Lies vor dem Freigeben [Sicher betreiben](#sicher-betreiben).
