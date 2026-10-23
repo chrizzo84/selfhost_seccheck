@@ -31,7 +31,7 @@ jobs:
     env:
       PUSH: ${{ github.event_name != 'pull_request' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Image name
         # Registry paths must be lowercase.
