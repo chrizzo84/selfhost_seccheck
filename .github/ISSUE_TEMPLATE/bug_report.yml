@@ -1,0 +1,43 @@
+name: Bug report
+description: Something does not work or a check reports a wrong result
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please do **not** post URLs, IP addresses or other details of your instances here
+        unless you are fine with them being public.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Include the check id (shown in the expanded result, e.g. `tls.cert_expiry`) for wrong results.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: input
+    id: app
+    attributes:
+      label: Scanned application and version
+      placeholder: Nextcloud 33.0.4 behind nginx
+  - type: input
+    id: version
+    attributes:
+      label: SecCheck version or commit
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How do you run SecCheck?
+      options: [Docker, start.sh, pip / manually, CLI]
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or output
+      render: shell

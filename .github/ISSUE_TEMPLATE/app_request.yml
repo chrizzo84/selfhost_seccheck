@@ -1,0 +1,30 @@
+name: New application
+description: Suggest a self-hosted application SecCheck should support
+labels: [new-app]
+body:
+  - type: input
+    id: app
+    attributes:
+      label: Application
+      placeholder: e.g. Mealie
+    validations:
+      required: true
+  - type: input
+    id: repo
+    attributes:
+      label: Project repository
+  - type: textarea
+    id: checks
+    attributes:
+      label: What should be checked?
+      description: |
+        Typical misconfigurations, public endpoints that reveal the version or setup state, known pitfalls.
+        Checks must work without logging in and must not change anything on the instance.
+    validations:
+      required: true
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Contribution
+      options:
+        - label: I would like to implement this myself (see CONTRIBUTING.md)

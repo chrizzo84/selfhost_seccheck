@@ -1,0 +1,16 @@
+services:
+  seccheck:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      # Scan history, targets and notification settings (SQLite).
+      - ./data:/app/data
+    environment:
+      # Set to 1 when the scanner is reachable from the internet, so it
+      # cannot be abused to probe your internal network.
+      SECCHECK_BLOCK_PRIVATE: "0"
+      # GITHUB_TOKEN: ""          # optional, raises the rate limit for version/advisory lookups
+      # SECCHECK_CA_BUNDLE: /certs/ca.pem   # trust an internal CA
+      # SECCHECK_SCHEDULER: "0"   # disable scheduled scans
+    restart: unless-stopped

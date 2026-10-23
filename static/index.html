@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SelfHost SecCheck</title>
+  <meta name="description" data-i18n-content="meta.description" content="Security checks for self-hosted software: TLS, certificate, headers, versions and app-specific checks.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%232563eb' d='M12 2 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5z'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="brand" href="#/">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5z"/><path class="tick" d="m8.5 12 2.5 2.5 4.5-5"/></svg>
+        SelfHost SecCheck
+      </a>
+      <div class="topbar-right">
+        <nav class="nav" aria-label="Main">
+          <a href="#/" data-nav="scan" data-i18n="nav.scan">Scan</a>
+          <a href="#/dashboard" data-nav="dashboard" data-i18n="nav.dashboard">Dashboard</a>
+          <a href="#/settings" data-nav="settings" data-i18n="nav.settings">Settings</a>
+        </nav>
+        <select id="lang-switch" class="lang-switch" data-i18n-title="nav.language" aria-label="Language"></select>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- Scan: setup -->
+    <div data-view="scan">
+      <section class="intro">
+        <h1 data-i18n="intro.title">How secure is your self-hosted instance?</h1>
+        <p class="lead" data-i18n="intro.lead"></p>
+      </section>
+
+      <section class="panel" id="setup">
+        <h2><span class="step">1</span> <span data-i18n="setup.url">URL of the instance</span></h2>
+        <form id="scan-form" novalidate>
+          <div class="url-row">
+            <input id="url" name="url" type="text" inputmode="url" autocomplete="url" spellcheck="false"
+                   placeholder="https://cloud.example.com" required>
+            <button type="button" id="detect" class="btn" data-i18n="setup.detect">Detect app</button>
+          </div>
+          <label class="consent">
+            <input type="checkbox" id="consent" required>
+            <span data-i18n="setup.consent"></span>
+          </label>
+          <p class="form-note" id="detect-note" role="status" hidden></p>
+
+          <h2><span class="step">2</span> <span data-i18n="setup.app">Application</span></h2>
+          <div class="app-grid" id="apps" role="radiogroup" data-i18n-title="setup.app"></div>
+
+          <div class="start-row">
+            <button type="submit" id="start" class="btn primary" data-i18n="setup.start">Start scan</button>
+            <p class="form-error" id="form-error" role="alert" hidden></p>
+          </div>
+        </form>
+
+        <details class="check-preview">
+          <summary><span data-i18n="setup.checks">Which checks run?</span> <span id="check-count" class="muted"></span></summary>
+          <div id="check-list"></div>
+        </details>
+      </section>
+    </div>
+
+    <!-- Report (live scan and stored scans) -->
+    <section id="report" hidden>
+      <div class="panel summary">
+        <div class="grade-ring" id="grade-ring" data-grade="">
+          <svg viewBox="0 0 120 120" aria-hidden="true">
+            <circle class="track" cx="60" cy="60" r="52"/>
+            <circle class="bar" id="grade-bar" cx="60" cy="60" r="52"/>
+          </svg>
+          <div class="grade-text">
+            <span id="grade">…</span>
+            <small id="score"></small>
+          </div>
+        </div>
+        <div class="summary-body">
+          <div class="summary-head">
+            <div>
+              <div class="muted small" id="sum-app"></div>
+              <div class="target" id="sum-target"></div>
+              <div class="muted small" id="sum-when"></div>
+            </div>
+            <div class="actions">
+              <button class="btn" id="copy-md" disabled data-i18n="report.copyMd">Copy as Markdown</button>
+              <button class="btn" id="export" disabled data-i18n="report.export">Export JSON</button>
+              <button class="btn" id="rescan" disabled data-i18n="report.rescan">Scan again</button>
+            </div>
+          </div>
+          <div class="progress" aria-hidden="true"><div id="progress-bar"></div></div>
+          <div class="counts" id="counts"></div>
+          <ul class="caps" id="caps"></ul>
+          <div class="cat-scores" id="cat-scores"></div>
+        </div>
+      </div>
+
+      <div class="panel diff" id="diff" hidden></div>
+
+      <div class="panel fixes" id="fixes" hidden>
+        <div class="fixes-head">
+          <h2 data-i18n="fixes.title">Config snippets</h2>
+          <div class="tabs" role="tablist" id="fix-tabs"></div>
+        </div>
+        <p class="muted small" data-i18n="fixes.hint"></p>
+        <div class="code-wrap">
+          <pre><code id="fix-code"></code></pre>
+          <button class="btn small-btn" id="fix-copy" data-i18n="fixes.copy">Copy</button>
+        </div>
+      </div>
+
+      <div class="filter-row">
+        <label class="toggle"><input type="checkbox" id="only-issues"> <span data-i18n="report.onlyIssues">Show problems only</span></label>
+      </div>
+      <div id="categories"></div>
+    </section>
+
+    <!-- Dashboard -->
+    <section data-view="dashboard" hidden>
+      <div class="page-head">
+        <h1 data-i18n="dashboard.title">Dashboard</h1>
+        <p class="muted" data-i18n="dashboard.lead"></p>
+      </div>
+      <div id="dashboard"></div>
+    </section>
+
+    <!-- History of one target -->
+    <section data-view="target" hidden>
+      <div id="target-view"></div>
+    </section>
+
+    <!-- Settings -->
+    <section data-view="settings" hidden>
+      <div class="page-head">
+        <h1 data-i18n="settings.title">Settings</h1>
+        <p class="muted" data-i18n="settings.lead"></p>
+      </div>
+      <form id="settings-form" class="panel settings" novalidate></form>
+    </section>
+  </main>
+
+  <footer class="wrap footer muted small">
+    <span data-i18n="footer"></span>
+    · <a href="https://github.com/chrizzo84/selfhost-seccheck" target="_blank" rel="noopener noreferrer">GitHub</a>
+  </footer>
+
+  <div class="chart-tip" id="chart-tip" role="tooltip" hidden></div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
