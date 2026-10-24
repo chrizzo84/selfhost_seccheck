@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -21,6 +21,8 @@ from .core.history import diff_scans
 from .core.registry import CATEGORIES, all_apps, all_checks, checks_for, get_app, load_plugins
 from .core.runner import run_scan
 from .core.target import Target, TargetError, ensure_allowed, parse_target
+from .cve import feed as cve_feed
+from .cve.catalog import get_product
 from .i18n import LANGUAGES, _, get_language, language
 from .scheduler import scheduler_loop
 from .service import rerate_latest, scan_and_record
@@ -34,12 +36,13 @@ STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     stop = asyncio.Event()
-    task = None
+    tasks = []
     if config.SCHEDULER_ENABLED:
-        task = asyncio.create_task(scheduler_loop(get_store(), stop))
+        tasks.append(asyncio.create_task(scheduler_loop(get_store(), stop)))
+        tasks.append(asyncio.create_task(cve_feed.cve_loop(get_store(), stop)))
     yield
     stop.set()
-    if task:
+    for task in tasks:
         task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await task
@@ -164,9 +167,12 @@ def _target_or_404(target_id: int) -> dict[str, Any]:
 @app.get("/api/targets")
 def list_targets() -> list[dict[str, Any]]:
     names = {a.id: _(a.name) for a in all_apps()}
-    targets = get_store().list_targets()
+    store = get_store()
+    targets = store.list_targets()
+    cves = store.cve_match_counts()
     for t in targets:
         t["app_name"] = names.get(t["app"], t["app"])
+        t["cves"] = cves.get(f"target:{t['id']}")
     return targets
 
 
@@ -250,6 +256,93 @@ async def test_notifications() -> dict[str, str]:
     if not result:
         raise HTTPException(400, _("No channel is enabled and fully configured."))
     return result
+
+
+# --- CVE feed -------------------------------------------------------------------
+
+
+@app.get("/api/cve/overview")
+def cve_overview() -> dict[str, Any]:
+    return cve_feed.overview(get_store())
+
+
+@app.get("/api/cve/feed")
+def cve_list(
+    product: str | None = None,
+    subject: str | None = None,
+    severity: Literal["critical", "high", "medium", "low"] | None = None,
+    affected: bool = False,
+    kev: bool = False,
+    q: str = Query(default="", max_length=200),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=200),
+) -> dict[str, Any]:
+    return cve_feed.feed(
+        get_store(),
+        product=product,
+        subject=subject,
+        min_severity=severity,
+        affected_only=affected,
+        kev_only=kev,
+        query=q,
+        offset=offset,
+        limit=limit,
+    )
+
+
+@app.post("/api/cve/sync", status_code=202)
+async def cve_sync() -> dict[str, Any]:
+    """Start a full update in the background; progress is in /api/cve/overview."""
+    if not cve_feed.state.running:
+        task = asyncio.create_task(cve_feed.sync(get_store()))
+        _background.add(task)
+        task.add_done_callback(_background.discard)
+    return {"running": True}
+
+
+_background: set[asyncio.Task[Any]] = set()
+
+
+class WatchItem(BaseModel):
+    product: str = Field(max_length=64)
+    version: str = Field(min_length=1, max_length=64, pattern=r"^\s*v?\d[\w.+~-]*\s*$")
+    label: str = Field(default="", max_length=200)
+
+
+class WatchUpdate(BaseModel):
+    version: str | None = Field(default=None, min_length=1, max_length=64, pattern=r"^\s*v?\d[\w.+~-]*\s*$")
+    label: str | None = Field(default=None, max_length=200)
+
+
+@app.post("/api/cve/watch", status_code=201)
+def add_watch(item: WatchItem) -> dict[str, Any]:
+    if get_product(item.product) is None:
+        raise HTTPException(404, _("Unknown product: {product}", product=item.product))
+    watch = get_store().add_watch(item.product, item.version.strip(), item.label.strip())
+    cve_feed.request_sync()
+    return watch
+
+
+@app.patch("/api/cve/watch/{watch_id}")
+def update_watch(watch_id: int, update: WatchUpdate) -> dict[str, Any]:
+    store = get_store()
+    if store.get_watch(watch_id) is None:
+        raise HTTPException(404, _("Watchlist entry not found"))
+    store.update_watch(
+        watch_id,
+        version=update.version.strip() if update.version else None,
+        label=update.label.strip() if update.label is not None else None,
+    )
+    cve_feed.request_sync()
+    return store.get_watch(watch_id) or {}
+
+
+@app.delete("/api/cve/watch/{watch_id}", status_code=204)
+def delete_watch(watch_id: int) -> None:
+    store = get_store()
+    if store.get_watch(watch_id) is None:
+        raise HTTPException(404, _("Watchlist entry not found"))
+    store.delete_watch(watch_id)
 
 
 @app.middleware("http")

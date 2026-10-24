@@ -19,6 +19,7 @@
         <nav class="nav" aria-label="Main">
           <a href="#/" data-nav="scan" data-i18n="nav.scan">Scan</a>
           <a href="#/dashboard" data-nav="dashboard" data-i18n="nav.dashboard">Dashboard</a>
+          <a href="#/cves" data-nav="cves" data-i18n="nav.cves">Vulnerabilities</a>
           <a href="#/settings" data-nav="settings" data-i18n="nav.settings">Settings</a>
         </nav>
         <select id="lang-switch" class="lang-switch" data-i18n-title="nav.language" aria-label="Language"></select>
@@ -129,6 +130,15 @@
     <!-- History of one target -->
     <section data-view="target" hidden>
       <div id="target-view"></div>
+    </section>
+
+    <!-- Vulnerability feed -->
+    <section data-view="cves" hidden>
+      <div class="page-head">
+        <h1 data-i18n="cve.title">Vulnerabilities</h1>
+        <p class="muted" data-i18n="cve.lead"></p>
+      </div>
+      <div id="cves"></div>
     </section>
 
     <!-- Settings -->

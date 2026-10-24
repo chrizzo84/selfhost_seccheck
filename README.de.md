@@ -21,11 +21,31 @@ Anmeldung**. Scanne nur Instanzen, die du betreibst oder ausdrücklich testen da
 - **Geplante Scans** (alle 6 Stunden, täglich, wöchentlich) mit **Benachrichtigung** über ntfy, Gotify, Pushover
   oder E-Mail, wenn neue Probleme auftauchen oder sich die Note verschlechtert
 - **Akzeptierte Risiken**: Befunde pro Instanz akzeptieren; sie bleiben sichtbar, zählen aber nicht mehr in die Note
-- **Bekannte Sicherheitslücken** der erkannten Version aus den GitHub Security Advisories
+- **Schwachstellen-Feed**: die neuesten CVEs für deine Software, abgeglichen mit den erkannten Versionen, mit CISA
+  KEV (aktiv ausgenutzt) und EPSS, Watchlist für Software, die sich nicht scannen lässt (Reverse-Proxy,
+  Hypervisor, SSH, …), und Alarm, wenn eine neue Schwachstelle eines deiner Systeme betrifft
+- **Bekannte Sicherheitslücken** der erkannten Version aus den GitHub Security Advisories im Scan-Bericht
 - **Vollständige Cipher-Analyse** mit sslyze (SSLv2/v3, RC4, 3DES, …)
 - Oberfläche und Berichte auf **Deutsch und Englisch**
 
 Die Liste der unterstützten Anwendungen und aller Checks steht in der [englischen README](README.md#supported-applications).
+
+## Schwachstellen-Feed
+
+Die Seite **Schwachstellen** zeigt die neuesten CVEs und Security Advisories zu jedem Produkt, das du betreibst, und
+welche deiner Systeme betroffen sind. Der Abgleich ist reine Versionslogik ohne KI: Ein System ist betroffen, wenn
+seine Version in einem veröffentlichten betroffenen Bereich liegt. Quellen: OSV.dev, GitHub Security Advisories,
+NVD, CISA KEV (aktiv ausgenutzt) und FIRST EPSS (Ausnutzungswahrscheinlichkeit).
+
+- **Systeme** sind deine gescannten Instanzen (Version aus dem letzten Scan) und Einträge der **Watchlist**, deren
+  Version du selbst einträgst. Synchronisiert werden nur Produkte, die du nutzt.
+- Aktualisierung alle 2 Stunden (`SECCHECK_CVE_SYNC_HOURS`), ein neues Produkt innerhalb einer Minute. Die erste
+  Synchronisierung dauert ein paar Minuten, weil die NVD ohne [API-Key](https://nvd.nist.gov/developers/request-an-api-key)
+  (`NVD_API_KEY`) nur 5 Anfragen pro 30 Sekunden erlaubt.
+- **Alarme** gehen über die Benachrichtigungskanäle raus, wenn eine neue Schwachstelle ein System betrifft (ab
+  einstellbarem Schweregrad, Standard *hoch*) oder eine bekannte in CISA KEV auftaucht.
+- nginx, Apache und OpenSSH patchen Distributionen oft ohne Versionswechsel; Treffer heißen dort „möglicherweise
+  betroffen“.
 
 ## Schnellstart
 
@@ -83,7 +103,8 @@ hoher höchstens C. Akzeptierte Risiken zählen nicht.
 
 Alle Umgebungsvariablen stehen in der [englischen README](README.md#configuration). Die wichtigsten:
 `SECCHECK_LANG` (Standardsprache), `SECCHECK_DATA_DIR` (SQLite-Daten), `SECCHECK_BLOCK_PRIVATE=1` (private
-Netze als Ziel sperren) und `GITHUB_TOKEN` (höheres Rate-Limit für Versions- und Advisory-Abfragen).
+Netze als Ziel sperren), `GITHUB_TOKEN` (höheres Rate-Limit für Versions- und Advisory-Abfragen), `NVD_API_KEY`
+(schnellere CVE-Synchronisierung) und `SECCHECK_CVE_SYNC_HOURS` (Intervall des Schwachstellen-Feeds).
 Benachrichtigungen konfigurierst du in der Oberfläche unter **Einstellungen**.
 
 ## Sicher betreiben

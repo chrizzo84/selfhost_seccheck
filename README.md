@@ -24,7 +24,10 @@ Only scan instances you operate or are explicitly allowed to test.
 - **Scheduled scans** (every 6 hours, daily, weekly) with **notifications** via ntfy, Gotify, Pushover or
   email when new problems appear or the grade drops
 - **Accepted risks**: accept a finding per instance; it stays visible but no longer counts towards the grade
-- **Known vulnerabilities** for the detected version from GitHub security advisories
+- **Vulnerability feed**: the latest CVEs for the software you run, matched against the detected versions, with
+  CISA KEV (actively exploited) and EPSS scores, a watchlist for software that cannot be scanned (reverse proxy,
+  hypervisor, SSH, …) and alerts when a new vulnerability affects one of your systems
+- **Known vulnerabilities** for the detected version from GitHub security advisories in the scan report
 - **Full cipher analysis** with sslyze (SSLv2/v3, RC4, 3DES, …)
 - **English and German** interface and reports
 
@@ -56,6 +59,31 @@ Generic checks for every application:
 | DNS / best practices | CAA record, `security.txt` |
 
 Missing your favourite app? Adding one is a single file, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Vulnerability feed
+
+The **Vulnerabilities** page lists the latest CVEs and security advisories for every product you run and shows
+which of your systems are affected. Matching is plain version logic, no AI involved: a system is affected when its
+version lies in an affected range published by one of the sources.
+
+| Source | Used for |
+|---|---|
+| [OSV.dev](https://osv.dev) | precise affected ranges for packaged projects (Go, PyPI, npm, crates.io) |
+| [GitHub security advisories](https://docs.github.com/en/code-security/security-advisories) | advisories published by the projects themselves |
+| [NVD](https://nvd.nist.gov) | CVSS scores and CVEs of products without their own advisories (nginx, Apache, OpenSSH, Proxmox, …) |
+| [CISA KEV](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) | vulnerabilities known to be exploited in the wild |
+| [FIRST EPSS](https://www.first.org/epss/) | probability of exploitation in the next 30 days |
+
+- **Systems** are your scanned instances (version from the last scan) and **watchlist** entries for software you
+  enter by hand. Only products you use are synced.
+- The feed updates every 2 hours (`SECCHECK_CVE_SYNC_HOURS`), a new product within a minute. The first sync can take
+  a few minutes, because the NVD allows 5 requests per 30 seconds without an [API key](https://nvd.nist.gov/developers/request-an-api-key) (`NVD_API_KEY`).
+- **Alerts** go to the notification channels when a new vulnerability affects a system (from a minimum severity,
+  default *high*) or a known one appears in CISA KEV. Configure them under **Settings**.
+- Supported products: Nextcloud, Gitea, Forgejo, Vaultwarden, Jellyfin, Immich, Paperless-ngx, Portainer, Grafana,
+  AdGuard Home, Uptime Kuma, Home Assistant, authentik, Caddy, Apache HTTP Server, Mastodon, Matrix Synapse, nginx,
+  OpenSSH, Pi-hole, Plex, Proxmox VE, Traefik, WordPress. Adding one is a line in
+  [seccheck/cve/catalog.py](seccheck/cve/catalog.py).
 
 ## Quick start
 
@@ -137,13 +165,15 @@ high one at most C. Accepted risks do not count. The logic is in [seccheck/core/
 |---|---|---|
 | `SECCHECK_LANG` | `en` | Default language (`en`, `de`) when the client does not ask for one; also used by the CLI |
 | `SECCHECK_DATA_DIR` | `./data` | Directory of the SQLite database (history, instances, settings) |
-| `SECCHECK_SCHEDULER` | `1` | `0` disables scheduled scans |
+| `SECCHECK_SCHEDULER` | `1` | `0` disables all background jobs: scheduled scans and CVE feed updates |
 | `SECCHECK_BLOCK_PRIVATE` | `0` | `1` refuses targets in private networks. **Set it whenever the scanner is reachable by others** (SSRF) |
 | `SECCHECK_CA_BUNDLE` | certifi | CA bundle for chain validation, e.g. including your internal CA |
 | `SECCHECK_CHECK_TIMEOUT` | `30` | Timeout per check in seconds |
 | `SECCHECK_HTTP_TIMEOUT` | `10` | Timeout per HTTP request in seconds |
 | `SECCHECK_CONCURRENCY` | `8` | Checks running in parallel |
 | `GITHUB_TOKEN` | – | Raises the GitHub rate limit (60/h without a token) for version and advisory lookups |
+| `NVD_API_KEY` | – | NVD API key: 50 instead of 5 requests per 30 seconds, faster first CVE sync |
+| `SECCHECK_CVE_SYNC_HOURS` | `2` | Hours between CVE feed updates; `0` updates only on request (button) |
 
 Notifications are configured in the web interface under **Settings**, including the language of scheduled
 scans. Credentials (tokens, user keys, SMTP password) are stored in the SQLite file and never sent back to
@@ -163,8 +193,13 @@ the browser. Scheduled scans run inside the web server process, so the server ha
 - The full cipher analysis needs sslyze (`.[full]`, included in the Docker image). Without it the scanner uses the
   local OpenSSL, which often cannot test RC4, DES or 3DES any more; those classes then show up as "not testable
   locally".
-- Known vulnerabilities are only found for projects that publish GitHub security advisories (Nextcloud, Gitea,
-  Vaultwarden, Jellyfin). Forgejo, Home Assistant and the newer profiles have no advisory check yet.
+- The advisory check in the scan report covers Nextcloud, Gitea, Vaultwarden and Jellyfin; the vulnerability feed
+  covers all products listed above.
+- The feed can only match systems whose version is known. Home Assistant, Uptime Kuma and AdGuard Home do not reveal
+  it without login: add them to the watchlist with their version.
+- Scans see the outside only: PHP, OpenSSL or OS packages behind the application are not matched. Products that
+  distributions patch without changing the version (nginx, Apache, OpenSSH) are reported as "possibly affected".
+- New CVEs of NVD-only products appear once the NVD has added version data, which can take days.
 - Results are an automated outside-in assessment. They do not replace a penetration test.
 
 ## Contributing

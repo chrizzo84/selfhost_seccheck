@@ -14,6 +14,8 @@ from .core.registry import AppProfile
 from .core.runner import run_scan
 from .core.scoring import compute_rating
 from .core.target import Target
+from .cve.catalog import product_for
+from .cve.feed import request_sync
 from .notify import notify_scan
 from .store import Store
 
@@ -52,6 +54,14 @@ async def scan_and_record(
                 results=results,
                 fixes=event["fixes"],
             )
+            detection = event.get("detection")
+            if detection:
+                product = product_for(app.id, detection["product"])
+                changed = await asyncio.to_thread(
+                    store.set_target_software, row["id"], product.id if product else None, detection["version"]
+                )
+                if changed:
+                    request_sync()
             event["scan_id"] = scan_id
             event["target_id"] = row["id"]
             event["diff"] = diff_scans(previous, results, event["rating"])

@@ -382,3 +382,72 @@ select, .field input {
 .topbar-right { display: flex; align-items: center; gap: 10px; }
 .lang-switch { height: 30px; padding: 0 6px; font-size: 13px; }
 .settings .general { margin-bottom: 18px; }
+
+/* --- vulnerability feed --------------------------------------------------------- */
+.cve-status { padding: 14px 18px; }
+.cve-status-main { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.cve-status p { margin: 8px 0 0; }
+.cve-running { display: inline-flex; align-items: center; gap: 8px; font-weight: 550; }
+.spinner {
+  width: 14px; height: 14px; border-radius: 50%; flex: none;
+  border: 2px solid var(--primary); border-right-color: transparent; animation: spin .8s linear infinite;
+}
+.cve-errors { margin-top: 8px; font-size: 13px; color: var(--warn); }
+.cve-errors summary { cursor: pointer; }
+.cve-errors .list { color: var(--muted); margin-top: 6px; }
+
+.cve-systems { list-style: none; margin: 0 0 14px; padding: 0; }
+.cve-system {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 10px 0; border-top: 1px solid var(--border);
+}
+.cve-system:first-child { border-top: none; padding-top: 0; }
+.cve-system[data-selected="true"] .target-name { color: var(--primary); }
+.cve-system-main { min-width: 0; }
+.cve-system-state { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 3px; font-size: 13.5px; }
+.cve-version { font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
+.cve-chips { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.cve-chips .badge { margin-top: 0; }
+.cve-ok { color: var(--pass); }
+.cve-system-actions { display: flex; gap: 8px; flex: none; }
+.badge.kev { background: var(--fail); color: #fff; }
+
+.cve-add { border-top: 1px solid var(--border); padding-top: 12px; }
+.cve-add summary { cursor: pointer; font-weight: 550; font-size: 14px; }
+.cve-add p { margin: 8px 0 10px; }
+.cve-watch-form { display: grid; grid-template-columns: 1.4fr 1fr 1.4fr auto; gap: 10px; align-items: end; }
+
+.cve-feed-title { font-size: 16px; margin: 6px 0 10px; }
+.cve-filters { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-bottom: 8px; }
+.cve-search {
+  flex: 1; min-width: 180px; height: 36px; padding: 0 10px; font: inherit; font-size: 14px; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+}
+.filter-chip {
+  display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 999px; font-size: 13px;
+  background: color-mix(in srgb, var(--primary) 10%, transparent); color: var(--text);
+}
+.cve-count { margin: 0 0 8px 4px; }
+.cve-list .check > summary { grid-template-columns: 1fr; }
+.cve-body { min-width: 0; }
+.cve-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-bottom: 4px; }
+.cve-head .badge { margin-top: 0; }
+.cve-id { font-family: var(--mono); font-size: 13px; font-weight: 600; text-decoration: none; }
+.cve-id:hover { text-decoration: underline; }
+.cve-scores { display: inline-flex; gap: 10px; align-items: center; margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cve-affects { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.cve-affect { font-size: 12.5px; padding: 2px 9px; border-radius: 999px; background: var(--fail-bg); color: var(--fail); }
+.cve-affect.possible { background: var(--warn-bg); color: var(--warn); }
+.cve-affect .muted { color: inherit; opacity: .8; }
+.cve-details { padding-left: 16px; }
+.cve-details .desc { white-space: pre-line; overflow-wrap: anywhere; }
+.cve-empty { padding: 18px 16px; margin: 0; }
+.cve-more { display: flex; justify-content: center; margin: 12px 0 20px; }
+a.count.cve-count-chip { text-decoration: none; background: var(--warn-bg); color: var(--warn); }
+a.count.cve-count-chip.kev { background: var(--fail-bg); color: var(--fail); }
+
+@media (max-width: 760px) {
+  .cve-watch-form { grid-template-columns: 1fr 1fr; }
+  .cve-system { flex-direction: column; align-items: flex-start; }
+  .cve-scores { margin-left: 0; }
+}

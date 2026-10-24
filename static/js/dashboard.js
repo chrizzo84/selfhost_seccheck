@@ -66,6 +66,13 @@ function targetCard(target) {
         "div",
         { class: "target-stats" },
         ...counts,
+        target.cves?.total
+          ? el("a", {
+              class: `count cve-count-chip${target.cves.kev ? " kev" : ""}`,
+              href: `#/cves?subject=target:${target.id}`,
+              text: t(target.cves.kev ? "dashboard.cvesKev" : "dashboard.cves", { count: target.cves.total, kev: target.cves.kev }),
+            })
+          : null,
         el("span", { class: "muted small", text: t("dashboard.lastScan", { when: relativeTime(last?.finished_at) }) }),
       ),
     ),

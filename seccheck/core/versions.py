@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import re
 import time
+from collections.abc import Awaitable, Callable
 from datetime import date
 from typing import Any
 
@@ -19,23 +20,66 @@ _cache: dict[str, tuple[float, Any]] = {}
 _locks: dict[str, asyncio.Lock] = {}
 
 
-async def _get_json(url: str, headers: dict[str, str] | None = None) -> Any:
+async def _cached(key: str, load: Callable[[], Awaitable[Any]]) -> Any:
+    """Result of ``load()``, cached for _CACHE_TTL and fetched once even when requested concurrently."""
     now = time.monotonic()
-    hit = _cache.get(url)
+    hit = _cache.get(key)
     if hit and now - hit[0] < _CACHE_TTL:
         return hit[1]
-    async with _locks.setdefault(url, asyncio.Lock()):
-        hit = _cache.get(url)
+    async with _locks.setdefault(key, asyncio.Lock()):
+        hit = _cache.get(key)
         if hit and now - hit[0] < _CACHE_TTL:
             return hit[1]
+        data = await load()
+        _cache[key] = (time.monotonic(), data)
+        return data
+
+
+async def _get_json(url: str, headers: dict[str, str] | None = None) -> Any:
+    async def load() -> Any:
         async with httpx.AsyncClient(
             timeout=10, headers={"User-Agent": config.USER_AGENT, **(headers or {})}
         ) as client:
             resp = await client.get(url)
             resp.raise_for_status()
-            data = resp.json()
-        _cache[url] = (time.monotonic(), data)
-        return data
+            return resp.json()
+
+    return await _cached(url, load)
+
+
+def github_headers() -> dict[str, str]:
+    headers = {"Accept": "application/vnd.github+json"}
+    if config.GITHUB_TOKEN:
+        headers["Authorization"] = f"Bearer {config.GITHUB_TOKEN}"
+    return headers
+
+
+async def github_paginated(
+    client: httpx.AsyncClient,
+    url: str,
+    *,
+    max_pages: int = 10,
+    more: Callable[[list[Any]], bool] | None = None,
+) -> list[Any]:
+    """All items of a GitHub list endpoint, following the ``Link: rel="next"`` header.
+
+    Some endpoints (e.g. repository security advisories) paginate with cursors
+    and ignore ``page=``. ``more(batch)`` can stop early, e.g. once a page
+    sorted by update time reaches items that are already known.
+    """
+    items: list[Any] = []
+    next_url: str | None = url
+    for _page in range(max_pages):
+        if not next_url:
+            break
+        resp = await client.get(next_url, headers=github_headers())
+        resp.raise_for_status()
+        batch = resp.json()
+        items.extend(batch)
+        if more is not None and not more(batch):
+            break
+        next_url = resp.links.get("next", {}).get("url")
+    return items
 
 
 async def eol_cycles(product: str) -> list[dict[str, Any]]:
@@ -43,19 +87,13 @@ async def eol_cycles(product: str) -> list[dict[str, Any]]:
 
 
 async def github_latest(repo: str) -> str:
-    headers = {"Accept": "application/vnd.github+json"}
-    if config.GITHUB_TOKEN:
-        headers["Authorization"] = f"Bearer {config.GITHUB_TOKEN}"
-    data = await _get_json(f"https://api.github.com/repos/{repo}/releases/latest", headers)
+    data = await _get_json(f"https://api.github.com/repos/{repo}/releases/latest", github_headers())
     return str(data["tag_name"]).lstrip("v")
 
 
 async def github_releases(repo: str) -> list[tuple[str, date]]:
     """Published, non-prerelease releases as (version, publish date), newest first."""
-    headers = {"Accept": "application/vnd.github+json"}
-    if config.GITHUB_TOKEN:
-        headers["Authorization"] = f"Bearer {config.GITHUB_TOKEN}"
-    data = await _get_json(f"https://api.github.com/repos/{repo}/releases?per_page=100", headers)
+    data = await _get_json(f"https://api.github.com/repos/{repo}/releases?per_page=100", github_headers())
     releases = []
     for rel in data:
         if rel.get("draft") or rel.get("prerelease") or not rel.get("published_at"):
@@ -74,6 +112,13 @@ def parse_version(value: str) -> tuple[int, ...]:
     core = re.split(r"[+\s]", value.strip().lstrip("vV"), maxsplit=1)[0]
     core = core.split("-", 1)[0]
     return tuple(int(p) for p in re.findall(r"\d+", core)[:4])
+
+
+def compare_versions(a: tuple[int, ...], b: tuple[int, ...]) -> int:
+    """-1, 0 or 1; missing components count as 0, so (1, 2) == (1, 2, 0)."""
+    width = max(len(a), len(b))
+    a, b = a + (0,) * (width - len(a)), b + (0,) * (width - len(b))
+    return (a > b) - (a < b)
 
 
 def _is_prefix(prefix: tuple[int, ...], version: tuple[int, ...]) -> bool:

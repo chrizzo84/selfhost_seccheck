@@ -22,6 +22,7 @@ CI runs the same commands; a pull request has to pass `pytest`, `ruff check` and
 ```
 seccheck/
   core/        scanner core: registry, scan context, runner, scoring, TLS, versions, advisories, fixes
+  cve/         CVE feed: product catalog, sources (GitHub, OSV, NVD, KEV, EPSS), version matching, sync
   checks/      generic checks that run for every application
   apps/        one module per application: profile, detector and app-specific checks
   locales/     translations of the backend (de/*.json)
@@ -102,6 +103,28 @@ Notes:
 - Add mocked tests (see `tests/test_apps_new.py`: `make_ctx` + `httpx.MockTransport`) for detection and for the
   pass/fail paths of each check.
 - Add the app to the table in `README.md`.
+- Add the product to `seccheck/cve/catalog.py` with `app="<id>"`, so scans feed the CVE page. Its detector must
+  return the version for that.
+
+## Adding a product to the CVE feed
+
+Every product in `seccheck/cve/catalog.py` can be added to the watchlist. A product lists where its
+vulnerabilities are published:
+
+```python
+Product("caddy", "Caddy", (osv("Go", "github.com/caddyserver/caddy/v2"),))
+Product("nginx", "nginx", (nvd("f5:nginx"),), backports=True)
+Product("immich", "Immich", (ghsa("immich-app/immich"),), app="immich")
+```
+
+- `osv("Ecosystem", "package")` when the project is a package in OSV.dev (Go, PyPI, npm, crates.io, …): the most
+  precise ranges. Look it up on https://osv.dev.
+- `ghsa("owner/repo", *packages)` when the project publishes security advisories in its GitHub repository.
+- `nvd("vendor:product")` for everything else; find the CPE on https://nvd.nist.gov/products/cpe/search.
+- `backports=True` for software usually installed from distribution packages, whose fixes are backported without a
+  version change. Matches are then shown as "possibly affected".
+
+Check that the source returns data (`curl` the OSV query or the NVD `virtualMatchString`) before adding it.
 
 ## Adding a generic check
 

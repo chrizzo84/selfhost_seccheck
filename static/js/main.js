@@ -5,8 +5,10 @@
 //   #/scan/:id             stored scan report
 //   #/dashboard            all targets
 //   #/target/:id           history of one target
+//   #/cves                 vulnerability feed and watchlist
 //   #/settings             notifications
 
+import { showCves } from "./cves.js";
 import { showDashboard } from "./dashboard.js";
 import { showStoredScan, showTarget } from "./history.js";
 import { LANGUAGES, lang, loadLanguage, switchLanguage, t } from "./i18n.js";
@@ -42,6 +44,10 @@ async function route() {
     } else if (parts[0] === "scan" && parts[1]) {
       setView("report-only", "dashboard");
       await showStoredScan(Number(parts[1]));
+    } else if (parts[0] === "cves") {
+      setView("cves", "cves");
+      showReport(false);
+      await showCves(params);
     } else if (parts[0] === "settings") {
       setView("settings", "settings");
       showReport(false);

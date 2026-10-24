@@ -28,8 +28,15 @@ CONCURRENCY = int(os.getenv("SECCHECK_CONCURRENCY", "8"))
 # a bundle that includes your internal CA if you run one.
 CA_BUNDLE = os.getenv("SECCHECK_CA_BUNDLE") or certifi.where()
 
-# Optional, raises the GitHub API rate limit for release lookups.
+# Optional, raises the GitHub API rate limit for release and advisory lookups.
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+
+# Optional NVD API key (free, https://nvd.nist.gov/developers/request-an-api-key):
+# 50 instead of 5 requests per 30 seconds.
+NVD_API_KEY = os.getenv("NVD_API_KEY")
+
+# Hours between two updates of the CVE feed; 0 updates it only on request.
+CVE_SYNC_HOURS = float(os.getenv("SECCHECK_CVE_SYNC_HOURS", "2"))
 
 USER_AGENT = "SelfHostSecCheck/0.1"
 

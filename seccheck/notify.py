@@ -32,6 +32,9 @@ DEFAULTS: dict[str, Any] = {
     "public_url": "",
     # Language of scheduled scans and their notifications.
     "language": config.DEFAULT_LANGUAGE,
+    # Alerts when a new vulnerability affects a monitored system. Actively
+    # exploited ones (CISA KEV) are always reported.
+    "cve": {"enabled": True, "min_severity": "high"},
     "ntfy": {"enabled": False, "server": "https://ntfy.sh", "topic": "", "token": ""},
     "gotify": {"enabled": False, "url": "", "token": ""},
     # token = application API token, user = user or group key, device optional.
@@ -48,6 +51,8 @@ DEFAULTS: dict[str, Any] = {
     },
 }
 
+CVE_SEVERITIES = ("critical", "high", "medium", "low")
+
 SEVERITY_LABELS = {
     "critical": N_("Critical"),
     "high": N_("High"),
@@ -62,6 +67,7 @@ def load_settings(store: Store) -> dict[str, Any]:
     merged: dict[str, Any] = {
         "public_url": stored.get("public_url", DEFAULTS["public_url"]),
         "language": normalize(stored.get("language", DEFAULTS["language"])),
+        "cve": {**DEFAULTS["cve"], **stored.get("cve", {})},
     }
     for channel in SECRETS:
         merged[channel] = {**DEFAULTS[channel], **stored.get(channel, {})}
@@ -69,7 +75,7 @@ def load_settings(store: Store) -> dict[str, Any]:
 
 
 def masked(settings: dict[str, Any]) -> dict[str, Any]:
-    out = {"public_url": settings["public_url"], "language": settings["language"]}
+    out = {"public_url": settings["public_url"], "language": settings["language"], "cve": dict(settings["cve"])}
     for channel, secret_fields in SECRETS.items():
         out[channel] = dict(settings[channel])
         for name in secret_fields:
@@ -82,6 +88,7 @@ def save_settings(store: Store, incoming: dict[str, Any]) -> dict[str, Any]:
     updated: dict[str, Any] = {
         "public_url": str(incoming.get("public_url", current["public_url"])).strip(),
         "language": normalize(incoming.get("language", current["language"])),
+        "cve": _cve_settings({**current["cve"], **(incoming.get("cve") or {})}),
     }
     for channel, secret_fields in SECRETS.items():
         values = {**current[channel], **(incoming.get(channel) or {})}
@@ -92,6 +99,14 @@ def save_settings(store: Store, incoming: dict[str, Any]) -> dict[str, Any]:
         updated[channel] = {k: values.get(k, v) for k, v in DEFAULTS[channel].items()}
     store.set_setting(SETTINGS_KEY, updated)
     return updated
+
+
+def _cve_settings(values: dict[str, Any]) -> dict[str, Any]:
+    severity = str(values.get("min_severity") or "")
+    return {
+        "enabled": bool(values.get("enabled")),
+        "min_severity": severity if severity in CVE_SEVERITIES else DEFAULTS["cve"]["min_severity"],
+    }
 
 
 # --- channels -------------------------------------------------------------
@@ -237,3 +252,56 @@ async def notify_scan(store: Store, target: dict[str, Any], scan: dict[str, Any]
     settings = await asyncio.to_thread(load_settings, store)
     title, body, priority = compose(target, diff, settings["public_url"])
     await send(settings, title, body, priority)
+
+
+# --- CVE feed ---------------------------------------------------------------
+
+
+def compose_cve(
+    subject: dict[str, Any], new: list[dict[str, Any]], exploited: list[dict[str, Any]], public_url: str
+) -> tuple[str, str, int]:
+    """Alert for one system: newly matching vulnerabilities and known ones that are now exploited.
+
+    Items are feed records with "id", "severity", "cvss", "summary", "kev", "fixed".
+    """
+    name = subject["name"]
+    if len(new) == 1:
+        title = _("SecCheck: {name} – new vulnerability {id}", name=name, id=new[0]["id"])
+    elif new:
+        title = _("SecCheck: {name} – {count} new vulnerabilities", name=name, count=len(new))
+    else:
+        title = _("SecCheck: {name} – vulnerability now actively exploited", name=name)
+    software = f"{subject['product_name']} {subject['version']}"
+    lines = [_("{software} is affected by:", software=software) if new else software]
+
+    def line(item: dict[str, Any]) -> str:
+        tags = [_(SEVERITY_LABELS[item["severity"]]) if item["severity"] in SEVERITY_LABELS else _("Unknown")]
+        if item.get("cvss"):
+            tags.append(f"CVSS {item['cvss']:.1f}")
+        if item.get("kev"):
+            tags.append(_("actively exploited"))
+        text = f"• {item['id']} [{', '.join(tags)}] {item['summary']}"
+        if item.get("fixed"):
+            text += " – " + _("fixed in {versions}", versions=item["fixed"])
+        return text
+
+    lines.extend(line(item) for item in new)
+    if exploited:
+        lines.append("")
+        lines.append(_("Now listed as actively exploited (CISA KEV):"))
+        lines.extend(line(item) for item in exploited)
+    if subject.get("possible"):
+        lines.append("")
+        lines.append(_("Distributions often backport fixes without changing the version; check your package."))
+    if public_url:
+        lines.append("")
+        lines.append(f"{public_url.rstrip('/')}/#/cves?subject={subject['key']}")
+
+    items = new + exploited
+    if exploited or any(i["severity"] == "critical" for i in items):
+        priority = 5
+    elif any(i["severity"] == "high" for i in items):
+        priority = 4
+    else:
+        priority = 3
+    return title, "\n".join(lines), priority

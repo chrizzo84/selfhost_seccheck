@@ -22,7 +22,7 @@ import httpx
 from .. import config
 from ..i18n import N_, _
 from .models import Outcome, Severity, errored, failed, passed, worst_severity
-from .versions import _get_json, parse_version
+from .versions import _cached, compare_versions, github_paginated, parse_version
 
 Version = tuple[int, ...]
 PackageFilter = Callable[[dict[str, Any]], bool]
@@ -42,13 +42,7 @@ _SEVERITY_LABEL = {
     "low": N_("low"),
 }
 _CONSTRAINT = re.compile(r"(>=|<=|≥|≤|>|<|==|=)?\s*v?(\d+(?:\.\d+)*)")
-MAX_PAGES = 3
-
-
-def _cmp(a: Version, b: Version) -> int:
-    width = max(len(a), len(b))
-    a, b = a + (0,) * (width - len(a)), b + (0,) * (width - len(b))
-    return (a > b) - (a < b)
+MAX_PAGES = 10
 
 
 def _constraints(text: str) -> list[tuple[str, Version]]:
@@ -68,7 +62,7 @@ def in_range(version: Version, text: str | None) -> bool | None:
         return None
 
     def ok(op: str, bound: Version) -> bool:
-        c = _cmp(version, bound)
+        c = compare_versions(version, bound)
         return {">=": c >= 0, ">": c > 0, "<=": c <= 0, "<": c < 0, "=": c == 0}[op]
 
     # A list of lower bounds only (">= 32.0.0, >= 33.0.0") enumerates affected
@@ -95,10 +89,10 @@ def is_affected(version: Version, vulnerable: str | None, patched: str | None) -
     for width in (2, 1):
         branch = [f for f in fixes if f[:width] == version[:width]]
         if branch:
-            return _cmp(version, min(branch)) < 0
+            return compare_versions(version, min(branch)) < 0
     # No fix in this branch: affected if the branch is older than every fixed
     # branch and the range says so (e.g. "< 12.0" fixed in 12.0).
-    if _cmp(version, min(fixes)) < 0:
+    if compare_versions(version, min(fixes)) < 0:
         return bool(matches_range)
     return False
 
@@ -114,17 +108,12 @@ class Advisory:
 
 
 async def fetch_advisories(repo: str) -> list[dict[str, Any]]:
-    headers = {"Accept": "application/vnd.github+json"}
-    if config.GITHUB_TOKEN:
-        headers["Authorization"] = f"Bearer {config.GITHUB_TOKEN}"
-    items: list[dict[str, Any]] = []
-    for page in range(1, MAX_PAGES + 1):
-        url = f"https://api.github.com/repos/{repo}/security-advisories?state=published&per_page=100&page={page}"
-        batch = await _get_json(url, headers)
-        items.extend(batch)
-        if len(batch) < 100:
-            break
-    return items
+    async def load() -> list[dict[str, Any]]:
+        async with httpx.AsyncClient(timeout=15, headers={"User-Agent": config.USER_AGENT}) as client:
+            url = f"https://api.github.com/repos/{repo}/security-advisories?state=published&per_page=100"
+            return await github_paginated(client, url, max_pages=MAX_PAGES)
+
+    return await _cached(f"advisories:{repo}", load)
 
 
 def matching(advisories: list[dict[str, Any]], version: str, package: PackageFilter) -> list[Advisory]:

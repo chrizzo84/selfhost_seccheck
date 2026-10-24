@@ -61,6 +61,14 @@ export async function showSettings() {
     Object.entries(LANGUAGES).map(([code, name]) => el("option", { value: code, selected: code === settings.language, text: name })),
   );
   const status = el("p", { class: "form-note", role: "status" });
+  const cveEnabled = el("input", { type: "checkbox", checked: settings.cve.enabled });
+  const cveMin = el(
+    "select",
+    {},
+    ["critical", "high", "medium", "low"].map((s) =>
+      el("option", { value: s, selected: s === settings.cve.min_severity, text: t("cve.minSeverity", { severity: t(`severity.${s}`) }) }),
+    ),
+  );
 
   form.replaceChildren(
     el(
@@ -68,6 +76,13 @@ export async function showSettings() {
       { class: "field-grid general" },
       el("label", { class: "field" }, el("span", { text: t("settings.publicUrl") }), publicUrl),
       el("label", { class: "field" }, el("span", { text: t("settings.language") }), language),
+    ),
+    el(
+      "fieldset",
+      { class: "channel" },
+      el("legend", {}, el("label", { class: "toggle" }, cveEnabled, ` ${t("settings.cveTitle")}`)),
+      el("p", { class: "muted small", text: t("settings.cveHint") }),
+      el("div", { class: "field-grid" }, el("label", { class: "field" }, el("span", { text: t("settings.cveMin") }), cveMin)),
     ),
     ...Object.entries(CHANNELS).map(([channel, fields]) => {
       const enabled = el("input", { type: "checkbox", checked: settings[channel].enabled });
@@ -95,7 +110,11 @@ export async function showSettings() {
   );
 
   const collect = () => {
-    const body = { public_url: publicUrl.value.trim(), language: language.value };
+    const body = {
+      public_url: publicUrl.value.trim(),
+      language: language.value,
+      cve: { enabled: cveEnabled.checked, min_severity: cveMin.value },
+    };
     for (const [channel, fields] of Object.entries(inputs)) {
       body[channel] = {};
       for (const [name, node] of Object.entries(fields)) {

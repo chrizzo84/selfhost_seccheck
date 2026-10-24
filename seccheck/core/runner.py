@@ -14,7 +14,7 @@ from ..i18n import _
 from .context import BlockedPath, FetchError, ScanContext, make_client
 from .fixes import build_fixes
 from .models import CheckResult, Outcome, SkipCheck, Status
-from .registry import CATEGORIES, AppProfile, CheckSpec, checks_for
+from .registry import CATEGORIES, AppProfile, CheckSpec, Detection, checks_for, get_detector
 from .scoring import compute_rating
 from .target import Target
 
@@ -55,6 +55,19 @@ async def _run_check(
     )
 
 
+async def _detect(app: AppProfile, ctx: ScanContext) -> Detection | None:
+    """Product and version for the CVE feed. The checks have already fetched what
+    the detector needs, so this mostly reads from the context's cache."""
+    detect = get_detector(app.id)
+    if detect is None:
+        return None
+    try:
+        return await asyncio.wait_for(detect(ctx), 15)
+    except Exception:  # detectors should not raise; a failure only means "unknown"
+        log.debug("Detector for %s failed", app.id, exc_info=True)
+        return None
+
+
 async def run_scan(
     app: AppProfile, target: Target, *, accepted: frozenset[str] = frozenset()
 ) -> AsyncIterator[dict[str, Any]]:
@@ -85,6 +98,7 @@ async def run_scan(
                 result = await next_done
                 results.append(result)
                 yield {"type": "result", "result": result.model_dump(mode="json")}
+            detection = await _detect(app, ctx)
         finally:
             # Also reached when the client disconnects mid-scan.
             for task in tasks:
@@ -100,4 +114,5 @@ async def run_scan(
         "duration_ms": int((finished - started).total_seconds() * 1000),
         "rating": compute_rating(results).model_dump(mode="json"),
         "fixes": build_fixes(results),
+        "detection": {"product": detection.product, "version": detection.version} if detection else None,
     }

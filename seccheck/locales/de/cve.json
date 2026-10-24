@@ -1,0 +1,12 @@
+{
+  "SecCheck: {name} – new vulnerability {id}": "SecCheck: {name} – neue Schwachstelle {id}",
+  "SecCheck: {name} – {count} new vulnerabilities": "SecCheck: {name} – {count} neue Schwachstellen",
+  "SecCheck: {name} – vulnerability now actively exploited": "SecCheck: {name} – Schwachstelle wird jetzt aktiv ausgenutzt",
+  "{software} is affected by:": "{software} ist betroffen von:",
+  "Unknown": "Unbewertet",
+  "actively exploited": "aktiv ausgenutzt",
+  "Now listed as actively exploited (CISA KEV):": "Jetzt als aktiv ausgenutzt gelistet (CISA KEV):",
+  "Distributions often backport fixes without changing the version; check your package.": "Distributionen spielen Fixes oft ein, ohne die Version zu ändern; prüfe dein Paket.",
+  "Unknown product: {product}": "Unbekanntes Produkt: {product}",
+  "Watchlist entry not found": "Watchlist-Eintrag nicht gefunden"
+}
