@@ -1,4 +1,4 @@
-FROM python:3.13-slim
+FROM python:3.15-slim
 
 LABEL org.opencontainers.image.title="SelfHost SecCheck" \
       org.opencontainers.image.description="Security checks for self-hosted software" \
